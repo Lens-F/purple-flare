@@ -13,7 +13,7 @@
 
 #include <linux/regulator/pm8xxx-regulator.h>
 
-#include "board-m7.h"
+#include "board-m7wl.h"
 
 #define VREG_CONSUMERS(_id) \
 	static struct regulator_consumer_supply vreg_consumers_##_id[]
@@ -25,7 +25,7 @@ VREG_CONSUMERS(L2) = {
 	REGULATOR_SUPPLY("8921_l2",		NULL),
 	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.0"),
 	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.1"),
-	REGULATOR_SUPPLY("mipi_csi_vdd",	"msm_csiphy.2"),
+	REGULATOR_SUPPLY("mipi_csi_vdd",        "msm_csiphy.2"),
 	REGULATOR_SUPPLY("lvds_pll_vdda",	"lvds.0"),
 	REGULATOR_SUPPLY("dsi1_pll_vdda",	"mipi_dsi.1"),
 };
@@ -103,7 +103,7 @@ VREG_CONSUMERS(L21) = {
 VREG_CONSUMERS(L22) = {
 	REGULATOR_SUPPLY("8921_l22",		NULL),
 };
-#if 0
+#if 1
 VREG_CONSUMERS(L23) = {
 	REGULATOR_SUPPLY("8921_l23",		NULL),
 	REGULATOR_SUPPLY("pll_vdd",		"pil_qdsp6v4.1"),
@@ -472,7 +472,7 @@ VREG_CONSUMERS(EXT_TS_SW) = {
 	}
 
 struct gpio_regulator_platform_data
-m7_gpio_regulator_pdata[] __devinitdata = {
+m7wl_gpio_regulator_pdata[] __devinitdata = {
 	
 	GPIO_VREG(EXT_5V, "ext_5v", "ext_5v_en", PM8921_MPP_PM_TO_SYS(7), NULL),
 	
@@ -483,20 +483,20 @@ m7_gpio_regulator_pdata[] __devinitdata = {
 			PM8921_MPP_PM_TO_SYS(8), NULL),
 };
 
-struct regulator_init_data m7_saw_regulator_pdata_8921_s5 =
+struct regulator_init_data m7wl_saw_regulator_pdata_8921_s5 =
 	
-	SAW_VREG_INIT(S5, "8921_s5",	       850000, 1300000);
-struct regulator_init_data m7_saw_regulator_pdata_8921_s6 =
-	SAW_VREG_INIT(S6, "8921_s6",	       850000, 1300000);
+	SAW_VREG_INIT(S5, "8921_s5",	       850000, 1350000);
+struct regulator_init_data m7wl_saw_regulator_pdata_8921_s6 =
+	SAW_VREG_INIT(S6, "8921_s6",	       850000, 1350000);
 
-struct regulator_init_data m7_saw_regulator_pdata_8821_s0 =
+struct regulator_init_data m7wl_saw_regulator_pdata_8821_s0 =
 	
-	SAW_VREG_INIT(8821_S0, "8821_s0",       850000, 1300000);
-struct regulator_init_data m7_saw_regulator_pdata_8821_s1 =
-	SAW_VREG_INIT(8821_S1, "8821_s1",       850000, 1300000);
+	SAW_VREG_INIT(8821_S0, "8821_s0",       850000, 1350000);
+struct regulator_init_data m7wl_saw_regulator_pdata_8821_s1 =
+	SAW_VREG_INIT(8821_S1, "8821_s1",       850000, 1350000);
 
 struct pm8xxx_regulator_platform_data
-m7_pm8921_regulator_pdata[] __devinitdata = {
+m7wl_pm8921_regulator_pdata[] __devinitdata = {
 	PM8XXX_NLDO1200(L26, "8921_l26", 0, 1, 375000, 1050000, 200, "8921_s7",
 		0, 1),
 
@@ -506,11 +506,11 @@ m7_pm8921_regulator_pdata[] __devinitdata = {
 };
 
 static struct rpm_regulator_init_data
-m7_rpm_regulator_init_data[] __devinitdata = {
+m7wl_rpm_regulator_init_data[] __devinitdata = {
 	
 	RPM_SMPS(S1, 1, 1, 0, 1225000, 1225000, NULL, 100000, 3p20, NONE, NONE),
 	RPM_SMPS(S2, 0, 1, 0, 1050000, 1200000, NULL, 100000, 1p60, NONE, NONE),
-	RPM_SMPS(S3, 0, 1, 1,  500000, 1150000, NULL, 100000, 4p80, NONE, NONE),
+	RPM_SMPS(S3, 0, 1, 1,  500000, 1250000, NULL, 100000, 4p80, NONE, NONE),
 	RPM_SMPS(S4, 1, 1, 0, 1800000, 1800000, NULL, 100000, 1p60, AUTO, AUTO),
 	RPM_SMPS(S7, 0, 0, 0, 1300000, 1300000, NULL, 100000, 3p20, NONE, NONE),
 	RPM_SMPS(S8, 0, 1, 0, 2200000, 2200000, NULL,      0, 1p60, NONE, NONE),
@@ -535,8 +535,8 @@ m7_rpm_regulator_init_data[] __devinitdata = {
 	RPM_LDO(L18, 0, 1, 0, 1300000, 1300000, "8921_s4",     0,     0),
 	RPM_LDO(L21, 0, 1, 0, 1050000, 1800000, NULL,          0,     0),
 	RPM_LDO(L22, 1, 1, 0, 2850000, 2850000, NULL,          0,     0),
-	
-	RPM_LDO(L24, 0, 1, 1,  750000, 1150000, "8921_s1", 10000, 10000),
+	RPM_LDO(L23, 0, 1, 0, 1800000, 1800000, NULL,          0,     0),
+	RPM_LDO(L24, 0, 1, 1,  750000, 1250000, "8921_s1", 10000, 10000),
 	RPM_LDO(L25, 1, 1, 0, 1225000, 1225000, "8921_s1", 10000, 10000),
 	RPM_LDO(L27, 0, 0, 0, 1050000, 1050000, "8921_s7",     0,     0),
 	
@@ -580,12 +580,12 @@ static struct rpm_regulator_consumer_mapping
 	RPM_REG_MAP(S3,   0, 5, "krait3_dig",   "acpuclk-8064"),
 };
 
-int m7_pm8921_regulator_pdata_len __devinitdata =
-	ARRAY_SIZE(m7_pm8921_regulator_pdata);
+int m7wl_pm8921_regulator_pdata_len __devinitdata =
+	ARRAY_SIZE(m7wl_pm8921_regulator_pdata);
 
-struct rpm_regulator_platform_data m7_rpm_regulator_pdata __devinitdata = {
-	.init_data		= m7_rpm_regulator_init_data,
-	.num_regulators		= ARRAY_SIZE(m7_rpm_regulator_init_data),
+struct rpm_regulator_platform_data m7wl_rpm_regulator_pdata __devinitdata = {
+	.init_data		= m7wl_rpm_regulator_init_data,
+	.num_regulators		= ARRAY_SIZE(m7wl_rpm_regulator_init_data),
 	.version		= RPM_VREG_VERSION_8960,
 	.vreg_id_vdd_mem	= RPM_VREG_ID_PM8921_L24,
 	.vreg_id_vdd_dig	= RPM_VREG_ID_PM8921_S3,
