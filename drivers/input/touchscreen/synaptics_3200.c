@@ -1699,18 +1699,9 @@ static int synaptics_init_panel(struct synaptics_ts_data *ts)
 	return ret;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
 static int last_touch_position_x = 0;
 static int last_touch_position_y = 0;
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
 
 static void sweep2wake_func(int button_id, cputime64_t trigger_time) {
 
@@ -1728,20 +1719,11 @@ static void sweep2wake_func(int button_id, cputime64_t trigger_time) {
                         printk(KERN_INFO"[sweep2wake]: >> OFF->ON <<\n");
                         sweep2wake_pwrtrigger();
 		}
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     }
     logo_press_state = 0;
     break_longtap_count = 1; // not in area, stop counting
     return 0;
 }
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
 
         } else if (!scr_suspended) {
 
@@ -1760,18 +1742,9 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 {
 	int ret;
 	uint8_t buf[ts->finger_support * 8];
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
 	int prevx = 0, nextx = 0;
 #endif
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
 
 	memset(buf, 0x0, sizeof(buf));
 	memset(noise_index, 0x0, sizeof(noise_index));
@@ -1925,6 +1898,15 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 				ts->tap_suppression = 0;
 			if (ts->debug_log_level & BIT(1))
 				printk(KERN_INFO "[TP] Finger leave\n");
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+				/* if finger released, reset count & barriers */
+				if ((((ts->finger_count > 0)?1:0) == 0) && (s2w_switch > 0)) {
+					exec_count = true;
+					barrier[0] = false;
+					barrier[1] = false;
+					scr_on_touch = false;
+				}
+#endif
 		}
 
 		if (ts->pre_finger_data[0][0] < 2 || finger_pressed) {
@@ -2096,72 +2078,76 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 							input_report_abs(ts->input_dev, ABS_MT_POSITION,
 								(finger_pressed == 0) << 31 |
 								finger_data[i][0] << 16 | finger_data[i][1]);
-<<<<<<< HEAD
-<<<<<<< HEAD
+						}
+
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
-							} else
-							{
-								printk("[L2M] till in area %d %d",last_touch_position_x,last_touch_position_y);
-								if (scr_suspended == false)
-								{
-									if (h2w_switch >= 2)
-									{ // logo to sleep or logo to wake enabled. screen is on, switch it off
-										if (l2m_switch == 0 && logo_delay_switch == 0 && report_ret == 3) // 3 = enough time passed for long tap, or logo delay is off
-										{
-											// OFF 
-											//sweep2wake_pwrtrigger(); // - don't sleep here, on short tap, only sleep when user finger left touchscreen
-										} else
-										if (l2m_2_phase == 1 || logo_delay_switch == 1)
-										{
-											if (l2m_2_phase == 1)
-											{
-												menu_pressed = 0;
-												// MENU event -> 1
-												sweep2wake_menutrigger();
+
+// 				      printk(KERN_INFO "[sweep2wake]: %d=> X:%d, Y:%d w:%d, z:%d\n",
+// 								i + 1, finger_data[i][0], finger_data[i][1],
+// 								finger_data[i][2], finger_data[i][3]);
+							//left->right
+							if ((ts->finger_count == 1) && (scr_suspended == true) && (s2w_switch > 0)) {
+								prevx = 30;
+								nextx = 400;
+								if ((barrier[0] == true) ||
+								   ((finger_data[i][0] > prevx) &&
+								    (finger_data[i][0] < nextx) &&
+								    (finger_data[i][1] > 2775))) {
+									prevx = nextx;
+									nextx = 990;
+									barrier[0] = true;
+									if ((barrier[1] == true) ||
+									   ((finger_data[i][0] > prevx) &&
+									    (finger_data[i][0] < nextx) &&
+									    (finger_data[i][1] > 2775))) {
+										prevx = nextx;
+										barrier[1] = true;
+										if ((finger_data[i][0] > prevx) &&
+										    (finger_data[i][1] > 2775)) {
+											if (finger_data[i][0] > 1300) {
+												if (exec_count) {
+													printk(KERN_INFO "[sweep2wake]: ON");
+													sweep2wake_pwrtrigger();
+													exec_count = false;
+													break;
+												}
 											}
-											// long tap needed, start counting
-											sweep2wake_longtap_count_trigger();
-										}
-									} else
-									// logo2menu enabled and some wake option too - longtap count for power off can start
-									if (l2m_switch > 0 && (s2w_switch > 0 || h2w_switch > 0) && logo_delay_switch == 1)
-									{
-											if (l2m_2_phase == 1)
-											{
-												menu_pressed = 0;
-												// MENU event -> 1
-												sweep2wake_menutrigger();
-											}
-											sweep2wake_longtap_count_trigger();
-									} else
-									{
-										if (l2m_switch > 0 && (l2m_2_phase == 1 || (s2w_switch == 0 && h2w_switch == 0)) )
-										{
-											menu_pressed = 0;
-											// MENU event -> 1
-											sweep2wake_menutrigger();
-											// long tap needed, start counting
-											sweep2wake_longtap_count_trigger();
-										} else
-										if (l2m_switch > 0)
-										{
-											sweep2wake_longtap_count_trigger();
 										}
 									}
-								} else
-								{
-									if (s2w_switch == 0 && h2w_switch == 3 && logo_delay_switch == 1)
-									{ // logo to wake enabled with logo Delay. screen is off, start counting
-										sweep2wake_longtap_count_trigger();
+								}
+							//right->left
+							} else if ((ts->finger_count == 1) && (scr_suspended == false) && (s2w_switch > 0)) {
+								scr_on_touch=true;
+								prevx = 1650;
+								nextx = 1300;
+								if ((barrier[0] == true) ||
+								   ((finger_data[i][0] < prevx) &&
+								    (finger_data[i][0] > nextx) &&
+								    (finger_data[i][1] > 2775))) {
+									prevx = nextx;
+									nextx = 750;
+									barrier[0] = true;
+									if ((barrier[1] == true) ||
+									   ((finger_data[i][0] < prevx) &&
+									    (finger_data[i][0] > nextx) &&
+									    (finger_data[i][1] > 2775))) {
+										prevx = nextx;
+										barrier[1] = true;
+										if ((finger_data[i][0] < prevx) &&
+										    (finger_data[i][1] > 2775)) {
+											if (finger_data[i][0] < 400) {
+												if (exec_count) {
+													printk(KERN_INFO "[sweep2wake]: OFF");
+													sweep2wake_pwrtrigger();
+													exec_count = false;
+													break;
+												}
+											}
+										}
 									}
 								}
 							}
 #endif
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
-=======
->>>>>>> 2ac1314... Sweep2wake updated for HTC One
-						}
 
 						finger_pressed &= ~BIT(i);
 
