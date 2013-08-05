@@ -3743,10 +3743,8 @@ void show_thread_group_state_filter(const char *tg_comm, unsigned long state_fil
 	rcu_read_lock();
 	do_each_thread(g, p) {
 		touch_nmi_watchdog();
-		if (!tg_comm || (tg_comm && !strncmp(tg_comm, g->comm, TASK_COMM_LEN))) {
-			if (!state_filter || (p->state & state_filter))
-				sched_show_task(p);
-		}
+		if (!state_filter || (p->state & state_filter))
+			sched_show_task(p);
 	} while_each_thread(g, p);
 
 	touch_all_softlockup_watchdogs();
@@ -3922,6 +3920,9 @@ static void migrate_tasks(unsigned int dead_cpu)
 	int dest_cpu;
 
 	rq->stop = NULL;
+
+	
+	unthrottle_offline_cfs_rqs(rq);
 
 	for ( ; ; ) {
 		if (rq->nr_running == 1)
@@ -4172,8 +4173,17 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
 		raw_spin_unlock_irqrestore(&rq->lock, flags);
 		break;
 
-	case CPU_DEAD:
-		calc_load_migrate(rq);
+		case CPU_DEAD:
+		{
+			struct rq *dest_rq;
+
+			local_irq_save(flags);
+			dest_rq = cpu_rq(smp_processor_id());
+			raw_spin_lock(&dest_rq->lock);
+			calc_load_migrate(rq);
+			raw_spin_unlock_irqrestore(&dest_rq->lock, flags);
+		}
+
 		break;
 #endif
 	}
