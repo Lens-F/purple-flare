@@ -1328,8 +1328,7 @@ static void batt_level_adjust(unsigned long time_since_last_update_ms)
 
 static void batt_update_limited_charge(void)
 {
-	if ((htc_batt_info.state & STATE_EARLY_SUSPEND)
-		|| (context_state & CONTEXT_STATE_BIT_DAYDREAM)) {
+	if (htc_batt_info.state & STATE_EARLY_SUSPEND) {
 		
 		set_limit_charge_with_reason(false, HTC_BATT_CHG_LIMIT_BIT_THRML);
 	} else {
@@ -1586,10 +1585,10 @@ static void batt_worker(struct work_struct *work)
 		
 		pr_info("[BATT] prev_chg_src=%d, prev_chg_en=%d,"
 				" chg_dis_reason/control/active=0x%x/0x%x/0x%x,"
-				" chg_limit_reason/active=0x%x/0x%x,"
+				" chg_limit_reason=0x%x,"
 				" pwrsrc_dis_reason=0x%x, prev_pwrsrc_enabled=%d,"
 				" context_state=0x%x,"
-				" htc_extension=0x%x, sw_stimer_counter=%ld\n",
+				" htc_extension=0x%x\n",
 					prev_chg_src, prev_charging_enabled,
 					chg_dis_reason,
 					chg_dis_reason & chg_dis_control_mask,
@@ -1598,8 +1597,7 @@ static void batt_worker(struct work_struct *work)
 					chg_limit_active_mask,
 					pwrsrc_dis_reason, prev_pwrsrc_enabled,
 					context_state,
-					htc_batt_info.htc_extension,
-					sw_stimer_counter);
+					htc_batt_info.htc_extension);
 		if (charging_enabled != prev_charging_enabled ||
 				prev_chg_src != htc_batt_info.rep.charging_source ||
 				first ||
@@ -2200,6 +2198,7 @@ static int __init htc_battery_init(void)
 	mutex_init(&batt_set_alarm_lock);
 #endif
 
+
 	
 	htc_batt_info.rep.batt_vol = 3700;
 	htc_batt_info.rep.batt_id = 1;
@@ -2223,9 +2222,7 @@ static int __init htc_battery_init(void)
 	alarm_data.upper_threshold = 4400;
 #endif
 
-	
-
-	platform_driver_register(&htc_battery_driver);
+	platform_driver_register(&htc_battery_driver); 
 
 	return 0;
 }

@@ -299,9 +299,9 @@ static int msmsdcc_vreg_reset(struct msmsdcc_host *host);
 static int msmsdcc_runtime_resume(struct device *dev);
 static int msmsdcc_execute_tuning(struct mmc_host *mmc, u32 opcode);
 static bool msmsdcc_is_wait_for_auto_prog_done(struct msmsdcc_host *host,
-					       struct mmc_request *mrq);
+						struct mmc_request *mrq);
 static bool msmsdcc_is_wait_for_prog_done(struct msmsdcc_host *host,
-					  struct mmc_request *mrq);
+						struct mmc_request *mrq);
 
 static inline unsigned short msmsdcc_get_nr_sg(struct msmsdcc_host *host)
 {
@@ -509,12 +509,13 @@ static void msmsdcc_hard_reset(struct msmsdcc_host *host)
 	}
 }
 
-static void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
+void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
 {
 	if (is_soft_reset(host)) {
+		if (is_soft_reset(host)) {
 		if (is_mmc_platform(host->plat)) {
 			if (is_sps_mode(host))
-			    host->sps.reset_bam = true;
+				host->sps.reset_bam = true;
 
 			msmsdcc_soft_reset(host);
 
@@ -543,8 +544,10 @@ static void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
 			mb();
 
 			msmsdcc_soft_reset(host);
+
 			pr_info("%s: Applied soft reset to Controller\n",
 					mmc_hostname(host->mmc));
+
 			if (is_sps_mode(host))
 				msmsdcc_dml_init(host);
 		}
@@ -563,7 +566,7 @@ static void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
 		mb();
 
 		msmsdcc_hard_reset(host);
-		pr_info("%s: Applied hard reset to controller\n",
+		pr_info("%s: Controller has been reinitialized\n",
 				mmc_hostname(host->mmc));
 
 		
@@ -662,6 +665,8 @@ msmsdcc_stop_data(struct msmsdcc_host *host)
 	host->curr.got_dataend = 0;
 	host->curr.wait_for_auto_prog_done = false;
 	host->curr.got_auto_prog_done = false;
+	writel_relaxed(0, host->base + MMCIDATACTRL);
+	msmsdcc_sync_reg_wr(host); 
 }
 
 static inline uint32_t msmsdcc_fifo_addr(struct msmsdcc_host *host)
@@ -912,7 +917,7 @@ static void msmsdcc_sps_complete_tlet(unsigned long data)
 		if (!mrq->data->stop || mrq->cmd->error ||
 			(mrq->sbc && !mrq->data->error)) {
 			mrq->data->bytes_xfered = host->curr.data_xfered;
-			msmsdcc_reset_dpsm(host);
+			msmsdcc_reset_dpsm(host); 
 			del_timer(&host->req_tout_timer);
 			memset(&host->curr, 0, sizeof(struct msmsdcc_curr_req));
 			spin_unlock_irqrestore(&host->lock, flags);
@@ -1278,6 +1283,7 @@ msmsdcc_start_command_deferred(struct msmsdcc_host *host,
 		*c |= MCI_CPSM_PROGENA;
 		host->prog_enable = 1;
 	}
+
 	if (cmd == cmd->mrq->stop)
 		*c |= MCI_CSPM_MCIABORT;
 
@@ -1863,9 +1869,16 @@ if (is_wimax_platform(host->plat) && mmc_wimax_get_status())
 				if (host->plat->sdiowakeup_irq)
 					wake_lock(&host->sdio_wlock);
 			} else {
-				spin_unlock(&host->lock);
-				mmc_signal_sdio_irq(host->mmc);
-				spin_lock(&host->lock);
+				struct mmc_host 	*mmc = host->mmc;
+				if (mmc->sdio_irqs)
+				{
+					spin_unlock(&host->lock);
+					mmc_signal_sdio_irq(host->mmc);
+					spin_lock(&host->lock);
+				} else {
+					status = readl_relaxed(host->base + MMCISTATUS);
+					printk("skip sdio irq %x\n", status);
+				}
 			}
 			ret = 1;
 			break;
@@ -2139,6 +2152,7 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	if (host->plat->is_sdio_al_client)
 		msmsdcc_sdio_al_lpm(mmc, false);
 
+	
 	if (is_mmc_platform(host->plat)) {
 		
 		if (is_sps_mode(host) && host->sps.reset_bam) {
@@ -2146,7 +2160,7 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 				if (!msmsdcc_bam_dml_reset_and_restore(host))
 					break;
 				pr_err("%s: msmsdcc_bam_dml_reset_and_restore returned error. %d attempts left.\n",
-					mmc_hostname(host->mmc), --retries);
+						mmc_hostname(host->mmc), --retries);
 			}
 		}
 	} else {
@@ -2220,9 +2234,9 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		spin_lock_irqsave(&host->lock, flags);
 	}
 
-	if (!host->pwr || !atomic_read(&host->clks_on) ||
-			host->sdcc_irq_disabled ||
-			host->sps.reset_bam) {
+	if (!host->pwr || !atomic_read(&host->clks_on)
+			|| host->sdcc_irq_disabled
+      			|| host->sps.reset_bam) { 
 		WARN(1, "%s: %s: SDCC is in bad state. don't process"
 		     " new request (CMD%d)\n", mmc_hostname(host->mmc),
 		     __func__, mrq->cmd->opcode);
@@ -2501,7 +2515,7 @@ static int msmsdcc_setup_vreg(struct msmsdcc_host *host, bool enable,
 	vreg_table[0] = curr_slot->vdd_data;
 	vreg_table[1] = curr_slot->vdd_io_data;
 	if(is_sd_platform(host->plat) && (enable ^ vreg_table[0]->is_enabled)) {
-		mdelay(10);
+		mdelay(5);
 		pr_info("%s: %s SD slot power\n",
 			enable ? "Enabling" : "Disabling", mmc_hostname(host->mmc));
 	}
@@ -2817,22 +2831,12 @@ static int msmsdcc_setup_pad(struct msmsdcc_host *host, bool enable)
 
 	curr = host->plat->pin_data->pad_data;
 	for (i = 0; i < curr->drv->size; i++) {
-		if (is_sd_platform(host->plat) && host->mmc->ios.timing == MMC_TIMING_UHS_SDR104) {
-			pr_info("mmc SD: %s sd set driving for SDR104\n",__func__);
-			if (enable)
-				msm_tlmm_set_hdrive(curr->drv->on_SDR104[i].no,
-					curr->drv->on_SDR104[i].val);
-			else
-				msm_tlmm_set_hdrive(curr->drv->off[i].no,
-					curr->drv->off[i].val);
-		} else {
-			if (enable)
-				msm_tlmm_set_hdrive(curr->drv->on[i].no,
-					curr->drv->on[i].val);
-			else
-				msm_tlmm_set_hdrive(curr->drv->off[i].no,
-					curr->drv->off[i].val);
-		}
+		if (enable)
+			msm_tlmm_set_hdrive(curr->drv->on[i].no,
+				curr->drv->on[i].val);
+		else
+			msm_tlmm_set_hdrive(curr->drv->off[i].no,
+				curr->drv->off[i].val);
 	}
 
 	for (i = 0; i < curr->pull->size; i++) {
@@ -3612,6 +3616,7 @@ static int msmsdcc_enable(struct mmc_host *mmc)
 get_sync:
 	if (is_sd_platform(host->plat))
 		host->enable_t = ktime_get();
+get_sync:
 	rc = pm_runtime_get_sync(dev);
 	if (is_sd_platform(host->plat))
 		atomic_set(&host->enable_count_usage, atomic_read(&dev->power.usage_count));
@@ -4355,11 +4360,7 @@ msmsdcc_check_status(unsigned long data)
 					" is ACTIVE_HIGH\n",
 					mmc_hostname(host->mmc),
 					host->oldstat, status);
-
-			if (is_sd_platform(host->plat))
-				mmc_detect_change(host->mmc, msecs_to_jiffies(SD_detect_debounce_time));
-			else
-				mmc_detect_change(host->mmc, 0);
+			mmc_detect_change(host->mmc, 0);
 		}
 		host->oldstat = status;
 	} else {
@@ -5021,7 +5022,7 @@ static void msmsdcc_req_tout_timer_hdlr(unsigned long data)
 
 	spin_lock_irqsave(&host->lock, flags);
 	if (host->dummy_52_sent) {
-		printk("%s: %s: dummy CMD52 timeout\n",
+		printk("%s: %s: dummy CMD52 timeout\n", 
 				mmc_hostname(host->mmc), __func__);
 		host->dummy_52_sent = 0;
 	}
@@ -5829,15 +5830,7 @@ msmsdcc_probe(struct platform_device *pdev)
 	       host->eject);
 	pr_info("%s: Power save feature enable = %d\n",
 	       mmc_hostname(mmc), msmsdcc_pwrsave);
-#if SD_DEBOUNCE_DEBUG
-	if (is_sd_platform(host->plat)) {
-		last_irq = ktime_set(0, 0);
-		detect_wq = ktime_set(0, 0);
-		irq_diff = ktime_set(0, 0);
-		pr_info("%s: SD detect pin de-bounce time = %d ms\n",
-			mmc_hostname(mmc), SD_detect_debounce_time);
-	}
-#endif
+
 	if (is_dma_mode(host) && host->dma.channel != -1
 			&& host->dma.crci != -1) {
 		pr_info("%s: DM non-cached buffer at %p, dma_addr 0x%.8x\n",

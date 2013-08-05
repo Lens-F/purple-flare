@@ -841,8 +841,7 @@ struct msm_snapshot_pp_status {
 #define CFG_SET_ACTUATOR_AF_VALUE		71
 #define CFG_SET_HDR_OUTDOOR_FLAG		72 
 #define CFG_SET_OIS_CALIBRATION		73 
-#define CFG_SET_VCM_CALIBRATION 74 
-#define CFG_MAX			        75
+#define CFG_MAX			        74
 
 #define CFG_I2C_IOCTL_R_OTP 70
 
@@ -1326,7 +1325,7 @@ struct sensor_cfg_data {
 	int rs;
 	uint8_t max_steps;
 	int8_t sensor_ver;
-	af_value_t af_value;
+  af_value_t af_value;
 
 	union {
 		int8_t effect;

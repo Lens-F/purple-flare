@@ -42,7 +42,7 @@
 
 #define OTP_SIZE 16
 #define OTP_FUSE_SIZE 12
-#define OTP_WAIT_TIMEOUT 200
+#define OTP_WAIT_TIMEOUT 500
 
 DEFINE_MUTEX(vd6869_mut);
 DEFINE_MUTEX(vd6869_sensor_init_mut);
@@ -1475,6 +1475,7 @@ static struct msm_camera_i2c_reg_conf vd6869_recommend_3_settings[] = {
 	{0x4a27, 0x40},
 	{0x4a28, 0x00}, 
 	{0x4a29, 0x40},
+
 	{0x33a4, 0x07}, 
 	{0x33a5, 0xC0},
 	{0x33a6, 0x00}, 
@@ -1489,6 +1490,7 @@ static struct msm_camera_i2c_reg_conf vd6869_recommend_3_settings[] = {
 	{0x4d27, 0x40},
 	{0x4d28, 0x00}, 
 	{0x4d29, 0x40},
+
 	{0x3399, 0x07}, 
 	{0x339a, 0xC0},
 	{0x339b, 0x00}, 
@@ -4608,7 +4610,7 @@ static struct msm_sensor_id_info_t vd6869_id_info = {
 static struct msm_sensor_exp_gain_info_t vd6869_exp_gain_info = {
 	.coarse_int_time_addr = 0x202,
 	.global_gain_addr = 0x204,
-	.vert_offset = 25,
+	.vert_offset = 10,
 	.min_vert = 4,  
 	.sensor_max_linecount = 65525,  
 };
@@ -4785,15 +4787,8 @@ static int vd6869_sensor_open_init(const struct msm_camera_sensor_info *data)
 	if (data->sensor_platform_info)
 		vd6869_s_ctrl.mirror_flip = data->sensor_platform_info->mirror_flip;
 
-	if(vd6869_s_ctrl.driver_ic == 0x11){
-		if(data->sensor_platform_info->sensor_mount_angle == ANGLE_90){
-			vd6869_s_ctrl.mirror_flip = CAMERA_SENSOR_NONE;
-			data->sensor_platform_info->mirror_flip = CAMERA_SENSOR_NONE;
-		}
-	}
-	pr_info("vd6869_sensor_open_init,vd6869_s_ctrl.mirror_flip=%d,data->sensor_platform_info->mirror_flip=%d", vd6869_s_ctrl.mirror_flip, data->sensor_platform_info->mirror_flip);
-	pr_info("vd6869_sensor_open_init,sensor_mount_angle=%d", data->sensor_platform_info->sensor_mount_angle);
-	pr_info("vd6869_sensor_open_init,vd6869_s_ctrl.driver_ic=%d", vd6869_s_ctrl.driver_ic);
+    pr_info("vd6869_sensor_open_init,vd6869_s_ctrl.mirror_flip=%d",vd6869_s_ctrl.mirror_flip);
+
 	return rc;
 }
 
@@ -4992,243 +4987,8 @@ static int vd6869_cut10_init_otp(struct msm_sensor_ctrl_t *s_ctrl){
 }
 
 
-static int vd6869_cut10_init_otp_NO_ECC(struct msm_sensor_ctrl_t *s_ctrl){
-	int i,rc = 0;
-	uint16_t read_data = 0;
-
-	
-	for(i = 0 ;i < OTP_WAIT_TIMEOUT; i++) {
-		rc = msm_camera_i2c_write_tbl(
-			s_ctrl->sensor_i2c_client
-			, otp_settings_cut10_NO_ECC,
-			ARRAY_SIZE(otp_settings_cut10_NO_ECC),
-			MSM_CAMERA_I2C_BYTE_DATA);
-
-		if(rc < 0)
-			pr_err("%s write otp init table error.... retry", __func__);
-		else{
-			pr_info("%s OTP table init done",__func__);
-			break;
-		}
-		mdelay(1);
-	}
-
-	
-	for(i = 0 ;i < OTP_WAIT_TIMEOUT; i++){
-		
-		rc = msm_camera_i2c_read(
-			s_ctrl->sensor_i2c_client,
-			(0x3302),&read_data,
-			MSM_CAMERA_I2C_BYTE_DATA);
-
-		if(rc < 0){
-			pr_err("%s read OTP status error",__func__);
-		} else if(read_data == 0x00){
-			rc = vd6869_shut_down_otp(s_ctrl,0x4584,0x00);
-			if(rc < 0)
-				return rc;
-			rc = vd6869_shut_down_otp(s_ctrl,0x44c0,0x00);
-			if(rc < 0)
-				return rc;
-			rc = vd6869_shut_down_otp(s_ctrl,0x4500,0x00);
-			if(rc < 0)
-				return rc;
-			break;
-		}
-		mdelay(1);
-	}
-	return rc;
-}
-
-
-
-
-
-#define VD6869_LITEON_OTP_SIZE 0x12
-const static short otp_addr[3][VD6869_LITEON_OTP_SIZE] = {
-    
-    {0x3C8,0x3C9,0x3CA,0x3CB,0x3CC,0x3A0,0x3A1,0x3A2,0x3CD,0x3CE,0x3C0,0x3C1,0x3C2,0x3C3,0x3C4,0x3C5,0x3C6,0x3C7}, 
-    {0x3D8,0x3D9,0x3DA,0x3DB,0x3DC,0x380,0x381,0x382,0x3DD,0x3DE,0x3D0,0x3D1,0x3D2,0x3D3,0x3D4,0x3D5,0x3D6,0x3D7}, 
-    {0x3B8,0x3B9,0x3BA,0x3BB,0x3BC,0x388,0x389,0x38A,0x3BD,0x3BE,0x3B0,0x3B1,0x3B2,0x3B3,0x3B4,0x3B5,0x3B6,0x3B7}, 
-};
-
-
-#if defined(CONFIG_ACT_OIS_BINDER)
-extern void HtcActOisBinder_set_OIS_OTP(uint8_t *otp_data, uint8_t otp_size);
-
-#define VD6869_LITEON_OIS_OTP_SIZE 34
-const static short ois_addr[3][VD6869_LITEON_OIS_OTP_SIZE] = {
-    
-    {0x090,0x091,0x092,0x093,0x094,0x095,0x096,0x097,0x098,0x099,0x09A,0x09B,0x09C,0x09D,0x09E,0x09F,0x0A0,0x0A1,0x0A2,0x0A3,0x0A4,0x0A5,0x0A6,0x0A7,0x0A8,0x0A9,0x0AA,0x0AB,0x0AC,0x0AD,0x0AE,0x0AF,0x0F0,0x0F4}, 
-    {0x0B0,0x0B1,0x0B2,0x0B3,0x0B4,0x0B5,0x0B6,0x0B7,0x0B8,0x0B9,0x0BA,0x0BB,0x0BC,0x0BD,0x0BE,0x0BF,0x0C0,0x0C1,0x0C2,0x0C3,0x0C4,0x0C5,0x0C6,0x0C7,0x0C8,0x0C9,0x0CA,0x0CB,0x0CC,0x0CD,0x0CE,0x0CF,0x0F8,0x0F9}, 
-    {0x0D0,0x0D1,0x0D2,0x0D3,0x0D4,0x0D5,0x0D6,0x0D7,0x0D8,0x0D9,0x0DA,0x0DB,0x0DC,0x0DD,0x0DE,0x0DF,0x0E0,0x0E1,0x0E2,0x0E3,0x0E4,0x0E5,0x0E6,0x0E7,0x0E8,0x0E9,0x0EA,0x0EB,0x0EC,0x0ED,0x0EE,0x0EF,0x0FC,0x0FD}, 
-};
-#endif
-
-static void vd6869_dump_otp_to_file(const short* add, const uint8_t* data, size_t count)
-{
-    uint8_t *path= "/data/vd6869_otp.txt";
-    struct file* f = msm_fopen (path, O_CREAT|O_RDWR|O_TRUNC, 0666);
-    char buf[512];
-    int i=0;
-    int len=0;
-    pr_info ("%s\n",__func__);
-
-    if (f) {
-        for (i=0; i<count; ++i) {
-            len += sprintf (buf+len,"0x%x 0x%x\n",add[i],data[i]);
-        }
-
-        msm_fwrite (f,0,buf,len);
-        msm_fclose (f);
-    } else {
-        pr_err ("%s: fail to open file\n", __func__);
-    }
-}
-
-int vd6869_read_fuseid_liteon(struct sensor_cfg_data *cdata,
-	struct msm_sensor_ctrl_t *s_ctrl, bool first)
-{
-	int32_t i,j;
-	int32_t rc = 0;
-	const int32_t offset = 0x33fa;
-	static int32_t valid_layer=-1;
-	uint16_t ews_data[4] = {0};
-    static uint8_t otp[VD6869_LITEON_OTP_SIZE];
-#if defined(CONFIG_ACT_OIS_BINDER)
-	int32_t ois_valid_layer=-1;
-	static uint8_t ois_otp[VD6869_LITEON_OIS_OTP_SIZE];
-#endif
-	uint16_t read_data = 0;
-
-	if (first) {
-		if (s_ctrl->sensordata->sensor_cut == 1) {
-			
-			for (i=0; i<4; i++) {
-				rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (offset + 0x3F4 + i), &ews_data[i], MSM_CAMERA_I2C_BYTE_DATA);
-				if (rc < 0){
-					pr_err("%s: msm_camera_i2c_read 0x%x failed\n", __func__, (offset + 0x3F4 + i));
-					return rc;
-				}
-				pr_info("%s: read OTP 0x%x = 0x%x\n", __func__, (0x3F4 + i), ews_data[i]);
-			}
-
-			if (ews_data[0]==0 && ews_data[1]==0 && ews_data[2]==0 && ews_data[3]==1) {
-				pr_info("%s: Apply OTP ECC enable", __func__);
-			} else {
-				
-				vd6869_cut10_init_otp_NO_ECC(s_ctrl);
-				pr_info("%s: Apply OTP ECC disable", __func__);
-			}
-		}
-
-        
-        for (j=2; j>=0; --j) {
-            for (i=0; i<VD6869_LITEON_OTP_SIZE; ++i) {
-                rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, otp_addr[j][i]+offset, &read_data, MSM_CAMERA_I2C_BYTE_DATA);
-                if (rc < 0){
-                    pr_err("%s: msm_camera_i2c_read 0x%x failed\n", __func__, otp_addr[j][i]);
-                    return rc;
-                }
-                pr_info("%s: OTP addr 0x%x = 0x%x\n", __func__,  otp_addr[j][i], read_data);
-
-                otp[i]= read_data;
-
-                if (read_data)
-                    valid_layer = j;
-            }
-            if (valid_layer!=-1)
-                break;
-        }
-        pr_info("%s: OTP valid layer = %d\n", __func__,  valid_layer);
-
-#if defined(CONFIG_ACT_OIS_BINDER)
-        
-        for (j=2; j>=0; --j) {
-            for (i=0; i<VD6869_LITEON_OIS_OTP_SIZE; ++i) {
-                rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, ois_addr[j][i]+offset, &read_data, MSM_CAMERA_I2C_BYTE_DATA);
-                if (rc < 0){
-                    pr_err("%s: msm_camera_i2c_read 0x%x failed\n", __func__, ois_addr[j][i]);
-                    return rc;
-                }
-                pr_info("%s: OTP ois_addr 0x%x = 0x%x\n", __func__,  ois_addr[j][i], read_data);
-
-                ois_otp[i]= read_data;
-
-                if (read_data)
-                    ois_valid_layer = j;
-            }
-            if (ois_valid_layer!=-1)
-                break;
-        }
-        pr_info("%s: OTP OIS valid layer = %d\n", __func__,  ois_valid_layer);
-
-
-	if (ois_valid_layer!=-1) {
-		for(i=0; i<VD6869_LITEON_OIS_OTP_SIZE;i ++)
-			pr_info("read out OTP OIS data = 0x%x\n", ois_otp[i]);
-
-		HtcActOisBinder_set_OIS_OTP(ois_otp, VD6869_LITEON_OIS_OTP_SIZE);
-	}
-#endif
-
-
-    }
-    
-    vd6869_ver = otp[2]; 
-    cdata->sensor_ver = otp[2];
-
-    
-    if(vd6869_ver == 0x0A){
-        vd6869_apply_analog_setting(s_ctrl);
-    }
-    if (board_mfg_mode()) {
-        vd6869_dump_otp_to_file (otp_addr[valid_layer], otp, VD6869_LITEON_OTP_SIZE);
-    }
-    
-    cdata->cfg.fuse.fuse_id_word1 = 0;
-    cdata->cfg.fuse.fuse_id_word2 = otp[5];
-    cdata->cfg.fuse.fuse_id_word3 = otp[6];
-    cdata->cfg.fuse.fuse_id_word4 = otp[7];
-
-    
-    cdata->af_value.VCM_BIAS = otp[8];
-    cdata->af_value.VCM_OFFSET = otp[9];
-    cdata->af_value.VCM_BOTTOM_MECH_MSB = otp[0xa];
-    cdata->af_value.VCM_BOTTOM_MECH_LSB = otp[0xb];
-    cdata->af_value.AF_INF_MSB = otp[0xc];
-    cdata->af_value.AF_INF_LSB = otp[0xd];
-    cdata->af_value.AF_MACRO_MSB = otp[0xe];
-    cdata->af_value.AF_MACRO_LSB = otp[0xf];
-    cdata->af_value.VCM_TOP_MECH_MSB = otp[0x10];
-    cdata->af_value.VCM_TOP_MECH_LSB = otp[0x11];
-    cdata->af_value.VCM_VENDOR_ID_VERSION = otp[4];
-    pr_info("%s: OTP Module vendor = 0x%x\n",               __func__,  otp[0]);
-    pr_info("%s: OTP LENS = 0x%x\n",                        __func__,  otp[1]);
-    pr_info("%s: OTP Sensor Version = 0x%x\n",              __func__,  otp[2]);
-    pr_info("%s: OTP Driver IC Vendor & Version = 0x%x\n",  __func__,  otp[3]);
-    pr_info("%s: OTP Actuator vender ID & Version = 0x%x\n",__func__,  otp[4]);
-
-    pr_info("%s: OTP fuse 0 = 0x%x\n", __func__,  cdata->cfg.fuse.fuse_id_word1);
-    pr_info("%s: OTP fuse 1 = 0x%x\n", __func__,  cdata->cfg.fuse.fuse_id_word2);
-    pr_info("%s: OTP fuse 2 = 0x%x\n", __func__,  cdata->cfg.fuse.fuse_id_word3);
-    pr_info("%s: OTP fuse 3 = 0x%x\n", __func__,  cdata->cfg.fuse.fuse_id_word4);
-
-    pr_info("%s: OTP BAIS Calibration data = 0x%x\n",           __func__,  cdata->af_value.VCM_BIAS);
-    pr_info("%s: OTP OFFSET Calibration data = 0x%x\n",         __func__,  cdata->af_value.VCM_OFFSET);
-    pr_info("%s: OTP VCM bottom mech. Limit (MSByte) = 0x%x\n", __func__,  cdata->af_value.VCM_BOTTOM_MECH_MSB);
-    pr_info("%s: OTP VCM bottom mech. Limit (LSByte) = 0x%x\n", __func__,  cdata->af_value.VCM_BOTTOM_MECH_LSB);
-    pr_info("%s: OTP Infinity position code (MSByte) = 0x%x\n", __func__,  cdata->af_value.AF_INF_MSB);
-    pr_info("%s: OTP Infinity position code (LSByte) = 0x%x\n", __func__,  cdata->af_value.AF_INF_LSB);
-    pr_info("%s: OTP Macro position code (MSByte) = 0x%x\n",    __func__,  cdata->af_value.AF_MACRO_MSB);
-    pr_info("%s: OTP Macro position code (LSByte) = 0x%x\n",    __func__,  cdata->af_value.AF_MACRO_LSB);
-    pr_info("%s: OTP VCM top mech. Limit (MSByte) = 0x%x\n",    __func__,  cdata->af_value.VCM_TOP_MECH_MSB);
-    pr_info("%s: OTP VCM top mech. Limit (LSByte) = 0x%x\n",    __func__,  cdata->af_value.VCM_TOP_MECH_LSB);
-
-    return 0;
-}
-int vd6869_read_fuseid_sharp(struct sensor_cfg_data *cdata,
-	struct msm_sensor_ctrl_t *s_ctrl,bool first)
+static int vd6869_read_fuseid(struct sensor_cfg_data *cdata,
+	struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int32_t rc = 0;
 	int i,j;
@@ -5243,48 +5003,49 @@ int vd6869_read_fuseid_sharp(struct sensor_cfg_data *cdata,
 	static uint8_t ois_otp[VD6869_LITEON_OIS_OTP_SIZE];
 #endif
 
+	static bool first= true;
 	pr_info("%s called \n", __func__);
 
 	if (first) {
 
+		if(s_ctrl->sensordata->sensor_cut == 1){
+			rc = vd6869_cut10_init_otp(s_ctrl);
+			if (rc < 0)
+				return rc;
+		}
+
 		
 		for (i = 0; i < OTP_SIZE; i++) {
-			rc = vd6869_i2c_read(
-					s_ctrl->sensor_i2c_client,
-					(0x37ba + i), &read_data,
-					MSM_CAMERA_I2C_BYTE_DATA);
+			rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (0x37ba + i), &read_data, MSM_CAMERA_I2C_BYTE_DATA);
 			if (rc < 0){
 				pr_err("%s: msm_camera_i2c_read 0x%x failed\n", __func__, (0x37ba + i));
 				return rc;
 			}
 			OTP[i] = (uint8_t)(read_data&0x00FF);
 			read_data = 0;
+			pr_info("index=0x%x, OTP value= 0x%x\n", i, OTP[i]);
 		}
 
 		for (j = 0; j < OTP_FUSE_SIZE; j++) {
-			rc = vd6869_i2c_read(
-					s_ctrl->sensor_i2c_client,
-					(0x37ee + j), &read_data,
-					MSM_CAMERA_I2C_BYTE_DATA);
+			rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (0x37ee + j), &read_data, MSM_CAMERA_I2C_BYTE_DATA);
 			if (rc < 0){
 				pr_err("%s: msm_camera_i2c_read 0x%x failed\n", __func__, (0x37ee + j));
 				return rc;
 			}
 			OTP_FUSE[j] = (uint8_t)(read_data&0x00FF);
 			read_data = 0;
+			pr_info("index=0x%x, OTP_FUSE value= 0x%x\n", j, OTP_FUSE[j]);
 		}
 
 		for (otp_date= 0; otp_date < 2; otp_date++) {
-			rc = vd6869_i2c_read(
-					s_ctrl->sensor_i2c_client,
-					(0x379A + otp_date), &read_data,
-					MSM_CAMERA_I2C_BYTE_DATA);
+			rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (0x379A + otp_date), &read_data, MSM_CAMERA_I2C_BYTE_DATA);
 			if (rc < 0){
 				pr_err("%s: msm_camera_i2c_read 0x%x failed\n", __func__, (0x379A + otp_date));
 				return rc;
 			}
 			OTP_DATE[otp_date] = (uint8_t)(read_data&0x00FF);
 			read_data = 0;
+			pr_info("index=0x%x, OTP_DATE value= 0x%x\n", otp_date, OTP_DATE[otp_date]);
 		}
 
 
@@ -5372,7 +5133,7 @@ int vd6869_read_fuseid_sharp(struct sensor_cfg_data *cdata,
 		cdata->af_value.AF_INF_LSB = OTP[3];
 		cdata->af_value.AF_MACRO_MSB = OTP[4];
 		cdata->af_value.AF_MACRO_LSB = OTP[5];
-		cdata->af_value.ACT_ID = OTP[12];
+		cdata->af_value.ACT_ID = OTP[12]; 
 		pr_info("VCM_START_MSB =0x%x\n", cdata->af_value.VCM_START_MSB);
 		pr_info("VCM_START_LSB =0x%x\n", cdata->af_value.VCM_START_LSB);
 		pr_info("AF_INF_MSB =0x%x\n", cdata->af_value.AF_INF_MSB);
@@ -5380,6 +5141,7 @@ int vd6869_read_fuseid_sharp(struct sensor_cfg_data *cdata,
 		pr_info("AF_MACRO_MSB =0x%x\n", cdata->af_value.AF_MACRO_MSB);
 		pr_info("AF_MACRO_LSB =0x%x\n", cdata->af_value.AF_MACRO_LSB);
 		pr_info("ACT_ID =0x%x\n", cdata->af_value.ACT_ID);
+		first = false;
 	} else {
 		cdata->af_value.VCM_START_MSB = OTP[0];
 		cdata->af_value.VCM_START_LSB = OTP[1];
@@ -5387,7 +5149,7 @@ int vd6869_read_fuseid_sharp(struct sensor_cfg_data *cdata,
 		cdata->af_value.AF_INF_LSB = OTP[3];
 		cdata->af_value.AF_MACRO_MSB = OTP[4];
 		cdata->af_value.AF_MACRO_LSB = OTP[5];
-		cdata->af_value.ACT_ID = OTP[12];
+		cdata->af_value.ACT_ID = OTP[12]; 
 
 		cdata->sensor_ver = OTP[10];
 
