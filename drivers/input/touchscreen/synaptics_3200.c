@@ -1701,9 +1701,12 @@ static int synaptics_init_panel(struct synaptics_ts_data *ts)
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
 static int last_touch_position_x = 0;
 static int last_touch_position_y = 0;
+=======
+>>>>>>> 2ac1314... Sweep2wake updated for HTC One
 =======
 >>>>>>> 2ac1314... Sweep2wake updated for HTC One
 =======
@@ -1727,11 +1730,14 @@ static void sweep2wake_func(int button_id, cputime64_t trigger_time) {
 		}
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     }
     logo_press_state = 0;
     break_longtap_count = 1; // not in area, stop counting
     return 0;
 }
+=======
+>>>>>>> 2ac1314... Sweep2wake updated for HTC One
 =======
 >>>>>>> 2ac1314... Sweep2wake updated for HTC One
 =======
@@ -1756,9 +1762,12 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 	uint8_t buf[ts->finger_support * 8];
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
 	int prevx = 0, nextx = 0;
 #endif
+=======
+>>>>>>> 2ac1314... Sweep2wake updated for HTC One
 =======
 >>>>>>> 2ac1314... Sweep2wake updated for HTC One
 =======
@@ -2088,6 +2097,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 								(finger_pressed == 0) << 31 |
 								finger_data[i][0] << 16 | finger_data[i][1]);
 <<<<<<< HEAD
+<<<<<<< HEAD
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
 							} else
 							{
@@ -2147,6 +2157,8 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 								}
 							}
 #endif
+=======
+>>>>>>> 2ac1314... Sweep2wake updated for HTC One
 =======
 >>>>>>> 2ac1314... Sweep2wake updated for HTC One
 						}
