@@ -587,8 +587,6 @@ int tg_nop(struct task_group *tg, void *data)
 }
 #endif
 
-void update_cpu_load(struct rq *this_rq);
-
 static void set_load_weight(struct task_struct *p)
 {
 	int prio = p->static_prio - MAX_RT_PRIO;
@@ -1877,23 +1875,13 @@ decay_load_missed(unsigned long load, unsigned long missed_updates, int idx)
 	return load;
 }
 
-void update_cpu_load(struct rq *this_rq)
+static void __update_cpu_load(struct rq *this_rq, unsigned long this_load,
+			      unsigned long pending_updates)
 {
-	unsigned long this_load = this_rq->load.weight;
-	unsigned long curr_jiffies = jiffies;
-	unsigned long pending_updates;
 	int i, scale;
 
 	this_rq->nr_load_updates++;
 
-	
-	if (curr_jiffies == this_rq->last_load_update_tick)
-		return;
-
-	pending_updates = curr_jiffies - this_rq->last_load_update_tick;
-	this_rq->last_load_update_tick = curr_jiffies;
-
-	
 	this_rq->cpu_load[0] = this_load; 
 	for (i = 1, scale = 2; i < CPU_LOAD_IDX_MAX; i++, scale += scale) {
 		unsigned long old_load, new_load;
@@ -1912,9 +1900,82 @@ void update_cpu_load(struct rq *this_rq)
 	sched_avg_update(this_rq);
 }
 
+#ifdef CONFIG_NO_HZ
+
+/*
+ * There is no sane way to deal with nohz on smp when using jiffies because the
+ * cpu doing the jiffies update might drift wrt the cpu doing the jiffy reading
+ * causing off-by-one errors in observed deltas; {0,2} instead of {1,1}.
+ *
+ * Therefore we cannot use the delta approach from the regular tick since that
+ * would seriously skew the load calculation. However we'll make do for those
+ * updates happening while idle (nohz_idle_balance) or coming out of idle
+ * (tick_nohz_idle_exit).
+ *
+ * This means we might still be one tick off for nohz periods.
+ */
+
+/*
+ * Called from nohz_idle_balance() to update the load ratings before doing the
+ * idle balance.
+ */
+void update_idle_cpu_load(struct rq *this_rq)
+{
+	unsigned long curr_jiffies = ACCESS_ONCE(jiffies);
+	unsigned long load = this_rq->load.weight;
+	unsigned long pending_updates;
+
+	/*
+	 *bail if there's load or we're actually up-to-date.
+	 */
+	if (load || curr_jiffies == this_rq->last_load_update_tick)
+		return;
+
+	pending_updates = curr_jiffies - this_rq->last_load_update_tick;
+	this_rq->last_load_update_tick = curr_jiffies;
+	__update_cpu_load(this_rq, load, pending_updates);
+}
+
+ /*
+ * Called from tick_nohz_idle_exit() -- try and fix up the ticks we missed.
+ */
+
+void update_cpu_load_nohz(void)
+
+{
+
+	struct rq *this_rq = this_rq();
+	unsigned long curr_jiffies = ACCESS_ONCE(jiffies);
+	unsigned long pending_updates;
+
+	if (curr_jiffies == this_rq->last_load_update_tick)
+		return;
+
+	raw_spin_lock(&this_rq->lock);
+	pending_updates = curr_jiffies - this_rq->last_load_update_tick;
+	if (pending_updates) {
+		this_rq->last_load_update_tick = curr_jiffies;
+		/*
+		 * We were idle, this means load 0, the current load might be
+		 * !0 due to remote wakeups and the sort.
+		 */
+		__update_cpu_load(this_rq, 0, pending_updates);
+	}
+	raw_spin_unlock(&this_rq->lock);
+}
+#endif /* CONFIG_NO_HZ */
+
+/*
+ * Called from scheduler_tick()
+ */
+
 static void update_cpu_load_active(struct rq *this_rq)
 {
-	update_cpu_load(this_rq);
+	/*
+	 *See the mess around update_idle_cpu_load() / update_cpu_load_nohz().
+	 */
+	this_rq->last_load_update_tick = jiffies;
+	__update_cpu_load(this_rq, this_rq->load.weight, 1);
 
 	calc_load_account_active(this_rq);
 }
@@ -4492,8 +4553,40 @@ static void update_top_cache_domain(int cpu)
 	int id = cpu;
 
 	sd = highest_flag_domain(cpu, SD_SHARE_PKG_RESOURCES);
-	if (sd)
+	if (sd) {
+	    struct sched_domain *tmp = sd;
+	    struct sched_group *sg, *prev;
+	    bool right;
+
+	    /*
+	     * Traverse to first CPU in group, and count hops
+	     * to cpu from there, switching direction on each
+	     * hop, never ever pointing the last CPU rightward.
+	     */
+	    do {
+	      id = cpumask_first(sched_domain_span(tmp));
+	      prev = sg = tmp->groups;
+	      right = 1;
+
+	      while (cpumask_first(sched_group_cpus(sg)) != id)
+		sg = sg->next;
+
+	      while (!cpumask_test_cpu(cpu, sched_group_cpus(sg))) {
+		prev = sg;
+		sg = sg->next;
+		right = !right;
+	      }
+
+	      /* A CPU went down, never point back to domain start. */
+	      if (right && cpumask_first(sched_group_cpus(sg->next)) == id)
+		right = false;
+
+	      sg = right ? sg->next : prev;
+	      tmp->idle_buddy = cpumask_first(sched_group_cpus(sg));
+	    } while ((tmp = tmp->child)); 
+
 		id = cpumask_first(sched_domain_span(sd));
+	}
 
 	rcu_assign_pointer(per_cpu(sd_llc, cpu), sd);
 	per_cpu(sd_llc_id, cpu) = id;
@@ -4799,7 +4892,8 @@ static void init_sched_groups_power(int cpu, struct sched_domain *sd)
 		return;
 
 	update_group_power(sd, cpu);
-	atomic_set(&sg->sgp->nr_busy_cpus, sg->group_weight);
+	atomic_set(&sg->sgp->nr_busy_cpus, 0);
+	set_bit(NOHZ_IDLE, nohz_flags(cpu));
 }
 
 int __weak arch_sd_sibling_asym_packing(void)
