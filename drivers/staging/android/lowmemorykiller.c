@@ -38,7 +38,8 @@
 #include <linux/rcupdate.h>
 #include <linux/notifier.h>
 
-static uint32_t lowmem_debug_level = 2;
+extern void show_meminfo(void);
+static uint32_t lowmem_debug_level = 1;
 static int lowmem_adj[6] = {
 	0,
 	1,
@@ -64,6 +65,15 @@ static size_t lowmem_fork_boost_minfree[6] = {
 };
 static int lowmem_fork_boost_minfree_size = 6;
 static size_t minfree_tmp[6] = {0, 0, 0, 0, 0, 0};
+
+static size_t fork_boost_adj[6] = {
+	0,
+	2,
+	4,
+	7,
+	9,
+	12
+};
 
 static unsigned long lowmem_deathpending_timeout;
 static unsigned long lowmem_fork_boost_timeout;
@@ -142,16 +152,21 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	int other_file = global_page_state(NR_FILE_PAGES) -
 		global_page_state(NR_SHMEM) - global_page_state(NR_MLOCK);
 	int fork_boost = 0;
+	int *adj_array;
 	size_t *min_array;
 
 	if (lowmem_fork_boost &&
 		time_before_eq(jiffies, lowmem_fork_boost_timeout)) {
 		for (i = 0; i < lowmem_minfree_size; i++)
 			minfree_tmp[i] = lowmem_minfree[i] + lowmem_fork_boost_minfree[i];
+
+		adj_array = fork_boost_adj;
 		min_array = minfree_tmp;
 	}
-	else
+	else {
+		adj_array = lowmem_adj;
 		min_array = lowmem_minfree;
+	}
 
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;
@@ -161,7 +176,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	for (i = 0; i < array_size; i++) {
 		if (other_free < min_array[i] &&
 		    other_file < min_array[i]) {
-			min_score_adj = lowmem_adj[i];
+			min_score_adj = adj_array[i];
 			fork_boost = lowmem_fork_boost_minfree[i];
 			break;
 		}
@@ -201,6 +216,14 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		if (!p)
 			continue;
 
+		if (test_tsk_thread_flag(p, TIF_MEMDIE) &&
+		    time_before_eq(jiffies, lowmem_deathpending_timeout)) {
+			lowmem_print(2, "%d (%s), oom_adj %d score_adj %d, is exiting, return\n"
+					, p->pid, p->comm, p->signal->oom_adj, p->signal->oom_score_adj);
+			task_unlock(p);
+			rcu_read_unlock();
+			return 0;
+		}
 		oom_score_adj = p->signal->oom_score_adj;
 		if (oom_score_adj < min_score_adj) {
 			task_unlock(p);
@@ -234,6 +257,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		lowmem_deathpending_timeout = jiffies + HZ;
 		if (selected_oom_adj < 7)
 		{
+			show_meminfo();
 			dump_tasks();
 		}
 		send_sig(SIGKILL, selected, 0);
