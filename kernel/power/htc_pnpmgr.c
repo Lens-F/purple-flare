@@ -368,9 +368,27 @@ static struct attribute_group apps_attr_group = {
 	.attrs = apps_g,
 };
 
-static struct attribute_group battery_attr_group = {
-	.attrs = battery_g,
+#ifdef CONFIG_HOTPLUG_CPU
+static int cpu_hotplug_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+	switch (action) {
+		
+		case CPU_ONLINE:
+		case CPU_ONLINE_FROZEN:
+			sysfs_notify(hotplug_kobj, NULL, "cpu_hotplug");
+			break;
+		case CPU_DEAD:
+		case CPU_DEAD_FROZEN:
+			break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __refdata cpu_hotplug_notifier = {
+	.notifier_call = cpu_hotplug_callback,
+	.priority = -10, 
 };
+#endif
 
 static unsigned int slack_time_ms;
 static unsigned int step_time_ms;
@@ -446,7 +464,7 @@ static int __init pnpmgr_init(void)
 	battery_kobj = kobject_create_and_add("battery", pnpmgr_kobj);
 	adaptive_policy_kobj = kobject_create_and_add("adaptive_policy", power_kobj);
 
-	if (!cpufreq_kobj || !hotplug_kobj || !thermal_kobj || !apps_kobj || !battery_kobj || !adaptive_policy_kobj) {
+	if (!cpufreq_kobj || !hotplug_kobj || !thermal_kobj || !apps_kobj || !adaptive_policy_kobj) {
 		pr_err("%s: Can not allocate enough memory.\n", __func__);
 		return -ENOMEM;
 	}
@@ -463,6 +481,10 @@ static int __init pnpmgr_init(void)
 		return ret;
 	}
 
+#ifdef CONFIG_HOTPLUG_CPU
+	register_hotcpu_notifier(&cpu_hotplug_notifier);
+#endif
+
 	return 0;
 }
 
@@ -474,6 +496,9 @@ static void  __exit pnpmgr_exit(void)
 	sysfs_remove_group(apps_kobj, &apps_attr_group);
 	sysfs_remove_group(battery_kobj, &battery_attr_group);
 	sysfs_remove_group(adaptive_policy_kobj, &adaptive_attr_group);
+#ifdef CONFIG_HOTPLUG_CPU
+	unregister_hotcpu_notifier(&cpu_hotplug_notifier);
+#endif
 }
 
 module_init(pnpmgr_init);
