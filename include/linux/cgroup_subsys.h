@@ -55,8 +55,18 @@ SUBSYS(perf)
 SUBSYS(net_prio)
 #endif
 
+<<<<<<< HEAD
 
 #ifdef CONFIG_CGROUP_TIMER_SLACK
 SUBSYS(timer_slack)
 #endif
 
+=======
+/* */
+
+#ifdef CONFIG_CGROUP_BFQIO
+SUBSYS(bfqio)
+#endif
+
+/* */
+>>>>>>> 64e5d2f... block: Added bfq 3.4.0-v6
