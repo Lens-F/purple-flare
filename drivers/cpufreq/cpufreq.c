@@ -551,7 +551,7 @@ void __ref send_cable_state(unsigned int state)
 		unsigned int value;
 		value = Lcharging_min_mhz_orig;
 		pr_alert("CHARGING MHZ OFF %u-%u\n", Lcharging_min_mhz, Lcharging_max_mhz);
-		if (value && !Lcharging_mhz_active_block_min && ((bluetooth_scaling_mhz_active && value > Lbluetooth_scaling_mhz) || !bluetooth_scaling_mhz_active))
+		if (value && ((bluetooth_scaling_mhz_active && value > Lbluetooth_scaling_mhz) || !bluetooth_scaling_mhz_active))
 		{
 			struct cpufreq_policy new_policy;
 			int cpu, ret;
@@ -569,7 +569,7 @@ void __ref send_cable_state(unsigned int state)
 			}
 		}
 		value = Lcharging_max_mhz_orig;
-		if (value && !Lcharging_mhz_active_block_max)
+		if (value)
 		{
 			struct cpufreq_policy new_policy;
 			int cpu, ret;
@@ -586,8 +586,7 @@ void __ref send_cable_state(unsigned int state)
 				}				
 			}
 		}
-		if (!Lcharging_mhz_active_block_min && !Lcharging_mhz_active_block_max)
-			Lcharging_mhz_active = false;
+		Lcharging_mhz_active = false;
 	}
 }
 
@@ -886,18 +885,7 @@ static ssize_t store_charging_max_mhz(struct cpufreq_policy *policy,
 	if (value < GLOBALKT_MIN_FREQ_LIMIT && value != 0)
 		value = GLOBALKT_MIN_FREQ_LIMIT;
 	Lcharging_max_mhz = value;
-
-	cbl_state = get_cable_state();
-	if (value == 0 && Lcharging_mhz_active && cbl_state)
-	{
-		Lcharging_mhz_active_block_min = true;
-		send_cable_state(0);
-		Lcharging_mhz_active_block_min = false;
-		if (Lcharging_min_mhz ==0)
-			Lcharging_mhz_active = false;
-	}
-	else
-		send_cable_state(cbl_state);
+	send_cable_state(get_cable_state());
 
 	return count;
 }
@@ -955,6 +943,8 @@ static ssize_t store_scaling_sched_screen_off(struct cpufreq_policy *policy,
 	ret = sscanf(buf, "%15s", scaling_sched_screen_off_sel);
 	return count;
 }
+store_one(scaling_min_freq, min);
+store_one(scaling_max_freq, max);
 
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
