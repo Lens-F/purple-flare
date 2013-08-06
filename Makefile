@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 4
 SUBLEVEL = 56
-EXTRAVERSION =
+EXTRAVERSION = purple-flare
 NAME = Saber-toothed Squirrel
 
 # *DOCUMENTATION*
